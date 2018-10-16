@@ -20,12 +20,14 @@ _boardNumber = lambda b: chr(ord('A')+b)
 class pencompy(object):
     """Interface with a Pencom relay controller."""
 
-    def __init__(self,host,port,pollingFreq=2.,boards=1,callBack=None):
+    def __init__(self,host,port,pollingFreq=2.,boards=1,callback=None):
         self._host = host
         self._port = port
         self._pollingFreq = pollingFreq
         self._boards = boards
-        self._callBack = callBack
+        self._callback = callback
+
+        self._pollingBoard = 0
 
         self._listenerThread = None
         self._pollingThread = None
@@ -52,19 +54,21 @@ class pencompy(object):
         # FIX: Contemplate throwing an error or return something
         return -1
 
-    def _updateState(self,board,relay,state):
-        if 0 <= board < self._boards and 0 <= relay < RELAYS_PER_BOARD:
+    def _updateState(self,relay,newState):
+        print( "update state:",self._pollingBoard,relay,newState)
+        if 0 <= relay < RELAYS_PER_BOARD:
             return
-        if self._stateTable[ board ][ relay ] != state:
-            if self._callBack:
-                self._callBack( board, relay, self._stateTable[ board ][ relay ], state )
-            self._stateTable[ board ][ relay ] = state
+        oldState = self._stateTable[ self._pollingBoard ][ relay ]
+        if oldState != newState:
+            if self._callback:
+                self._callback( board, relay, oldState, newState )
+            self._stateTable[ board ][ relay ] = newState
 
     def _send(self,command):
         # FIX: ADD LOCK
         # with self._lock:
         # FIX: If error, reconnect
-        self._telnet.write((command+'\r').encode('utf8'))
+        self._telnet.write((command+'\n').encode('utf8'))
 
     def close(self):
         if self._pollingThread:
@@ -106,12 +110,13 @@ class ListenerThread(Thread):
     def run(self):
         self.running = True
         while self.running:
-            input = self._pencom._telnet.read_until(b'\r',1.)
+            input = self._pencom._telnet.read_until(b'\r',1.).strip()
             if len(input) > 0:
                 bits = int(input)
                 mask = 0x0001
                 for r in range(RELAYS_PER_BOARD):
-                    self._pencom._updateState( self._pencom._pollingBoard, r, (bits & mask) != 0 )
+                    self._pencom._updateState( r, (bits & mask) != 0 )
+                    mask <<= 1
 
     def halt(self):
         self.running = False
