@@ -64,7 +64,7 @@ class pencompy(object):
         # FIX: ADD LOCK
         # with self._lock:
         # FIX: If error, reconnect
-        self._telnet.write(command+'\r')
+        self._telnet.write((command+'\r').encode('utf8'))
 
     def close(self):
         if self._pollingThread:
@@ -74,6 +74,7 @@ class pencompy(object):
             self._listenerThread.halt()
             self._listenerThread = None
         if self._telnet:
+            time.sleep(self._pollingFreq)
             self._telnet.close()
             self._telnet = None
 
@@ -105,7 +106,7 @@ class ListenerThread(Thread):
     def run(self):
         self.running = True
         while self.running:
-            input = self._pencom._telnet.read_until('\r',1.)
+            input = self._pencom._telnet.read_until(b'\r',1.)
             if len(input) > 0:
                 bits = int(input)
                 mask = 0x0001
