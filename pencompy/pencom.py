@@ -1,5 +1,5 @@
 """
-Pencom implements the "Light" interface to control one or more banks of relays
+Pencom implements the "Switch" interface to control one or more banks of relays
 over an Ethernet connection.  The relays are connected through RS232 to an
 RS232 to Ethernet convertor (NPort), and telnet is used as the protocol.
 """
@@ -8,7 +8,7 @@ import logging
 import voluptuous as vol
 
 # Import the device class from the component that you want to support
-from homeassistant.components.light import Light, PLATFORM_SCHEMA
+from homeassistant.components.switch import Switch, PLATFORM_SCHEMA
 from homeassistant.const import CONF_HOST, CONF_PORT, CONF_USERNAME, CONF_PASSWORD
 import homeassistant.helpers.config_validation as cv
 
@@ -55,7 +55,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
             add_devices(PencomRelay(hub, board, relay))
 
 
-class PencomRelay(Light):
+class PencomRelay(Switch):
     """Representation of a pencom relay."""
     def __init__(self, hub, board, relay):
         self._hub   = hub
