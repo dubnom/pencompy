@@ -1,1 +1,1 @@
-name = "pencom"
+name = "pencompy"

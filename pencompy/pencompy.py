@@ -17,10 +17,11 @@ RELAYS_PER_BOARD = 8
 
 _boardNumber = lambda b: chr(ord('A')+b)
 
-class pencompy(object):
+class pencompy(Thread):
     """Interface with a Pencom relay controller."""
 
     def __init__(self,host,port,pollingFreq=2.,boards=1,callback=None):
+        Thread.__init__(self,target=self)
         self._host = host
         self._port = port
         self._pollingFreq = pollingFreq
@@ -29,18 +30,17 @@ class pencompy(object):
 
         self._pollingBoard = 0
 
-        self._listenerThread = None
         self._pollingThread = None
         self._telnet = None
+        self._running = False
         self._connect()
+        self.start()
 
     def _connect(self):
-        # FIX: Connection goes here
+        # Add userID and password
         self._telnet = telnetlib.Telnet( self._host, self._port )
         self._stateTable = [ [ -1 for r in range(RELAYS_PER_BOARD) ] for b in range(self._boards) ]
-        self._listenerThread = ListenerThread(self)
         self._pollingThread = PollingThread(self,self._pollingFreq)
-        self._listenerThread.start()
         self._pollingThread.start()
 
     def set(self,board,relay,state):
@@ -70,13 +70,22 @@ class pencompy(object):
         # FIX: If error, reconnect
         self._telnet.write((command+'\n').encode('utf8'))
 
+    def run(self):
+        self._running = True
+        while self._running:
+            input = self._telnet.read_until(b'\r',1.).strip()
+            if len(input) > 0:
+                bits = int(input)
+                mask = 0x0001
+                for r in range(RELAYS_PER_BOARD):
+                    self._updateState( r, (bits & mask) != 0 )
+                    mask <<= 1
+
     def close(self):
+        self._running = False
         if self._pollingThread:
             self._pollingThread.halt()
             self._pollingThread = None
-        if self._listenerThread:
-            self._listenerThread.halt()
-            self._listenerThread = None
         if self._telnet:
             time.sleep(self._pollingFreq)
             self._telnet.close()
@@ -101,22 +110,3 @@ class PollingThread(Thread):
     def halt(self):
         self.running = False
     
-class ListenerThread(Thread):
-    """Thread that listens for status responses from all of the boards"""
-    def __init__(self,pencom):
-        super(ListenerThread,self).__init__()
-        self._pencom = pencom
-
-    def run(self):
-        self.running = True
-        while self.running:
-            input = self._pencom._telnet.read_until(b'\r',1.).strip()
-            if len(input) > 0:
-                bits = int(input)
-                mask = 0x0001
-                for r in range(RELAYS_PER_BOARD):
-                    self._pencom._updateState( r, (bits & mask) != 0 )
-                    mask <<= 1
-
-    def halt(self):
-        self.running = False
