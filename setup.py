@@ -11,7 +11,7 @@ setuptools.setup(
     description="Pencom relay controller over Ethernet",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/pypa/sampleproject",
+    url="https://github.com/dubnom/pencompy",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
