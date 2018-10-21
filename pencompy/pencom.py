@@ -24,7 +24,7 @@ CONF_BOARDS = 'boards'
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_HOST): cv.string,
     vol.Required(CONF_PORT): cv.port,
-    vol.Optional(CONF_BOARDS,1): cv.int,
+    vol.Optional(CONF_BOARDS, 1): cv.int,
     vol.Optional(CONF_USERNAME): cv.string,
     vol.Optional(CONF_PASSWORD): cv.string,
 })
@@ -32,33 +32,33 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Setup the Pencom relay platform (pencompy)."""
-    import pencompy
+    from pencompy import Pencompy, RELAYS_PER_BOARD
 
     # Assign configuration variables.
-    host     = config.get(CONF_HOST)
-    port     = config.get(CONF_PORT)
-    boards   = config.get(CONF_BOARDS)
+    host = config.get(CONF_HOST)
+    port = config.get(CONF_PORT)
+    boards = config.get(CONF_BOARDS)
     username = config.get(CONF_USERNAME)
     password = config.get(CONF_PASSWORD)
 
     # Setup connection with devices/cloud.
     # FIX: Add support for username and password to pencompy.
     try:
-        hub = pencompy.pencompy(host, port, boards=boards)
-    except:
-        _LOGGER.error("Could not connect to pencompy.")
-        return
+        hub = Pencompy(host, port, boards=boards)
+    except OSError as error:
+        _LOGGER.error("Could not connect to pencompy: %s", error)
+        return False
 
     # Add devices.
     for board in range(boards):
         for relay in range(RELAYS_PER_BOARD):
             add_devices(PencomRelay(hub, board, relay))
-
+    return True
 
 class PencomRelay(Switch):
     """Representation of a pencom relay."""
     def __init__(self, hub, board, relay):
-        self._hub   = hub
+        self._hub = hub
         self._board = board
         self._relay = relay
         self._state = None
@@ -66,17 +66,22 @@ class PencomRelay(Switch):
 
     @property
     def name(self):
+        """Relay name."""
         return self._name
 
     @property
     def is_on(self):
+        """Return a relay's state."""
         return self._state
 
     def turn_on(self, **kwargs):
+        """Turn a relay on."""
         self._hub.set(self._board, self._relay, True)
 
     def turn_off(self, **kwargs):
+        """Turn a relay off."""
         self._hub.set(self._board, self._relay, False)
 
     def update(self):
+        """Refresh a relay's state."""
         self._state = self._hub.get(self._board, self._relay)

@@ -1,13 +1,18 @@
-from pencompy import pencompy
+"""
+Test the pencom interface.
+"""
 from time import sleep
+from pencompy import Pencompy
 
-def callback(a,b,c):
-    print(a,b,c)
+def _callback(board, relay, value):
+    print(board, relay, value)
 
-p = pencompy('192.168.2.55',4008,callback=callback)
-for t in range(5):
-    p.set(0,0, t%2 == 0)
-    sleep(7.)
-p.set(0,0,False)
-p.close()
+def _main():
+    pen = Pencompy('192.168.2.55', 4008, callback=_callback)
+    for trial in range(5):
+        pen.set(0, 0, trial % 2 == 0)
+        sleep(7.)
+    pen.set(0, 0, False)
+    pen.close()
 
+_main()
