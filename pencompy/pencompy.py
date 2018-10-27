@@ -1,7 +1,7 @@
 """
 Pencompy is a library for controlling Pencom banks of relays.  The
 connection is done serially through an RS232 to Ethernet adaptor (NPort)
-that implements telnet protocols.
+that implements TCP sockets.
 
 the state for a relay isn't updated until a response from the board or a
 polling request occurs.
@@ -11,19 +11,19 @@ Michael Dubno - 2018 - New York
 
 from threading import Thread
 import time
-import telnetlib
+import socket
+import select
 
 RELAYS_PER_BOARD = 8
 
 BOARD_NUM = lambda b: chr(ord('A')+b)
 POLLING_FREQ = 2.
-CONNECTION_TIMEOUT = 15.0
 
 class Pencompy(Thread):
     """Interface with a Pencom relay controller."""
     # pylint: disable=too-many-instance-attributes
     _polling_thread = None
-    _telnet = None
+    _socket = None
     _running = False
     polling_board = 0
 
@@ -40,7 +40,7 @@ class Pencompy(Thread):
 
     def _connect(self):
         # Add userID and password
-        self._telnet = telnetlib.Telnet(self._host, self._port, CONNECTION_TIMEOUT)
+        self._socket = socket.create_connection((self._host, self._port))
         self._states = [[-1 for _ in range(RELAYS_PER_BOARD)] for _ in range(self.boards)]
         self._polling_thread = Polling(self, POLLING_FREQ)
         self._polling_thread.start()
@@ -70,21 +70,32 @@ class Pencompy(Thread):
 
     def send(self, command):
         """Send data to the relay controller."""
-        # FIX: ADD LOCK
-        # with self._lock:
         # FIX: If error, reconnect
-        self._telnet.write((command+'\n').encode('utf8'))
+        self._socket.send((command+'\n').encode('utf8'))
 
     def run(self):
         self._running = True
+        data = ''
         while self._running:
-            data = self._telnet.read_until(b'\r', 1.).strip()
-            if len(data) > 0:
-                bits = int(data)
-                mask = 0x0001
-                for relay in range(RELAYS_PER_BOARD):
-                    self._update_state(relay, (bits & mask) != 0)
-                    mask <<= 1
+            try:
+                readable, _, _ = select.select([self._socket], [], [], POLLING_FREQ)
+            except socket.error as err:
+                raise
+            if len(readable) != 0:
+                byte = self._socket.recv(1)
+                if byte == b'\r':
+                    self._processReceivedData(data.strip())
+                    data = ''
+                else:
+                    data += byte.decode('utf-8')
+
+    def _processReceivedData(self, data):
+        if len(data) > 0:
+            bits = int(data)
+            mask = 0x0001
+            for relay in range(RELAYS_PER_BOARD):
+                self._update_state(relay, (bits & mask) != 0)
+                mask <<= 1
 
     def close(self):
         """Close the connection."""
@@ -92,10 +103,10 @@ class Pencompy(Thread):
         if self._polling_thread:
             self._polling_thread.halt()
             self._polling_thread = None
-        if self._telnet:
+        if self._socket:
             time.sleep(POLLING_FREQ)
-            self._telnet.close()
-            self._telnet = None
+            self._socket.close()
+            self._socket = None
 
 
 class Polling(Thread):

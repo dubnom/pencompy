@@ -1,0 +1,6 @@
+cp pencom.py ~/dev/home-assistant/homeassistant/components/switch
+cd ..
+pip uninstall pencompy
+python3 setup.py sdist bdist_wheel
+pip install dist/pencompy-0.0.1.tar.gz
+cd pencompy

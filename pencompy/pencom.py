@@ -1,7 +1,7 @@
 """
 Pencom implements the "Switch" interface to control one or more banks of relays
 over an Ethernet connection.  The relays are connected through RS232 to an
-RS232 to Ethernet convertor (NPort), and telnet is used as the protocol.
+RS232 to Ethernet convertor (NPort).
 """
 import logging
 
@@ -19,30 +19,36 @@ _LOGGER = logging.getLogger(__name__)
 
 # Number of boards connected to the serial port
 CONF_BOARDS = 'boards'
+CONF_BOARD = 'board'
+CONF_ADDR = 'addr'
+CONF_RELAYS = 'relays'
+CONF_RELAY = 'relay'
+
+RELAY_SCHEMA = vol.Schema({
+    vol.Required(CONF_NAME): cv.string,
+    vol.Required(CONF_ADDR): cv.positive_int,
+    vol.Optional(CONF_BOARD, 1): cv.positive_int,
+})
 
 # Validation of the user's configuration
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_HOST): cv.string,
     vol.Required(CONF_PORT): cv.port,
-    vol.Optional(CONF_BOARDS, 1): cv.int,
-    vol.Optional(CONF_USERNAME): cv.string,
-    vol.Optional(CONF_PASSWORD): cv.string,
+    vol.Optional(CONF_BOARDS, 1): cv.positive_int,
+    vol.Required(CONF_RELAYS): vol.All(cv.ensure_list, [RELAY_SCHEMA]),
 })
 
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Setup the Pencom relay platform (pencompy)."""
-    from pencompy import Pencompy, RELAYS_PER_BOARD
+    from pencompy.pencompy import Pencompy, RELAYS_PER_BOARD
 
     # Assign configuration variables.
     host = config.get(CONF_HOST)
     port = config.get(CONF_PORT)
     boards = config.get(CONF_BOARDS)
-    username = config.get(CONF_USERNAME)
-    password = config.get(CONF_PASSWORD)
 
     # Setup connection with devices/cloud.
-    # FIX: Add support for username and password to pencompy.
     try:
         hub = Pencompy(host, port, boards=boards)
     except OSError as error:
@@ -50,19 +56,21 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
         return False
 
     # Add devices.
-    for board in range(boards):
-        for relay in range(RELAYS_PER_BOARD):
-            add_devices(PencomRelay(hub, board, relay))
+    for relay in config.get(CONF_RELAYS):
+        name = relay.get(CONF_NAME)
+        board = relay.get(CONF_BOARD)
+        addr = relay.get(CONF_ADDR)
+        add_devices(PencomRelay(hub, board, addr, name))
     return True
 
 class PencomRelay(Switch):
     """Representation of a pencom relay."""
-    def __init__(self, hub, board, relay):
+    def __init__(self, hub, board, addr, name):
         self._hub = hub
         self._board = board
-        self._relay = relay
+        self._addr = addr
         self._state = None
-        self._name = "Relay %d:%d" % (board, relay)
+        self._name = name
 
     @property
     def name(self):
@@ -76,12 +84,12 @@ class PencomRelay(Switch):
 
     def turn_on(self, **kwargs):
         """Turn a relay on."""
-        self._hub.set(self._board, self._relay, True)
+        self._hub.set(self._board, self._addr, True)
 
     def turn_off(self, **kwargs):
         """Turn a relay off."""
-        self._hub.set(self._board, self._relay, False)
+        self._hub.set(self._board, self._addr, False)
 
     def update(self):
         """Refresh a relay's state."""
-        self._state = self._hub.get(self._board, self._relay)
+        self._state = self._hub.get(self._board, self._addr)
