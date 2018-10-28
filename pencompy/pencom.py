@@ -8,8 +8,8 @@ import logging
 import voluptuous as vol
 
 # Import the device class from the component that you want to support
-from homeassistant.components.switch import Switch, PLATFORM_SCHEMA
-from homeassistant.const import CONF_HOST, CONF_PORT, CONF_USERNAME, CONF_PASSWORD
+from homeassistant.components.switch import SwitchDevice, PLATFORM_SCHEMA
+from homeassistant.const import CONF_HOST, CONF_PORT, CONF_NAME
 import homeassistant.helpers.config_validation as cv
 
 # Home Assistant depends on 3rd party packages for API specific code.
@@ -27,14 +27,14 @@ CONF_RELAY = 'relay'
 RELAY_SCHEMA = vol.Schema({
     vol.Required(CONF_NAME): cv.string,
     vol.Required(CONF_ADDR): cv.positive_int,
-    vol.Optional(CONF_BOARD, 1): cv.positive_int,
+    vol.Optional(CONF_BOARD, default=0): cv.positive_int,
 })
 
 # Validation of the user's configuration
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_HOST): cv.string,
     vol.Required(CONF_PORT): cv.port,
-    vol.Optional(CONF_BOARDS, 1): cv.positive_int,
+    vol.Optional(CONF_BOARDS, default=1): cv.positive_int,
     vol.Required(CONF_RELAYS): vol.All(cv.ensure_list, [RELAY_SCHEMA]),
 })
 
@@ -56,14 +56,16 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
         return False
 
     # Add devices.
+    devs = []
     for relay in config.get(CONF_RELAYS):
         name = relay.get(CONF_NAME)
         board = relay.get(CONF_BOARD)
         addr = relay.get(CONF_ADDR)
-        add_devices(PencomRelay(hub, board, addr, name))
+        devs.append(PencomRelay(hub, board, addr, name))
+    add_devices(devs, True)
     return True
 
-class PencomRelay(Switch):
+class PencomRelay(SwitchDevice):
     """Representation of a pencom relay."""
     def __init__(self, hub, board, addr, name):
         self._hub = hub

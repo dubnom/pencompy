@@ -13,6 +13,9 @@ from threading import Thread
 import time
 import socket
 import select
+import logging
+
+_LOGGER = logging.getLogger(__name__)
 
 RELAYS_PER_BOARD = 8
 
@@ -45,32 +48,35 @@ class Pencompy(Thread):
         self._polling_thread = Polling(self, POLLING_FREQ)
         self._polling_thread.start()
 
-    def set(self, board, relay, state):
+    def set(self, board, addr, state):
         """Turn a relay on/off."""
-        if 0 <= board < self.boards and 0 <= relay < RELAYS_PER_BOARD:
-            self.send('%s%s%d' % (BOARD_NUM(board), 'H' if state else 'L', relay+1))
-        # FIX: Contemplate throwing an error here
+        if 0 <= board < self.boards and 0 <= addr < RELAYS_PER_BOARD:
+            self.send('%s%s%d' % (BOARD_NUM(board), 'H' if state else 'L', addr+1))
+        else:
+            _LOGGER.error('SET Board or Addr out of range: %s, %s', board, addr)
 
-    def get(self, board, relay):
+    def get(self, board, addr):
         """Get the relay's state."""
-        if 0 <= board < self.boards and 0 <= relay < RELAYS_PER_BOARD:
-            return self._states[board][relay]
-        # FIX: Contemplate throwing an error or return something
+        if 0 <= board < self.boards and 0 <= addr < RELAYS_PER_BOARD:
+            return self._states[board][addr]
+        else:
+            _LOGGER.error('GET Board or Addr out of range: %s, %s', board, addr)
         return -1
 
-    def _update_state(self, relay, new_state):
-        if 0 <= relay < RELAYS_PER_BOARD:
+    def _update_state(self, addr, new_state):
+        if 0 <= addr < RELAYS_PER_BOARD:
             return
         board = self.polling_board
-        old_state = self._states[board][relay]
+        old_state = self._states[board][addr]
         if old_state != new_state:
             if self._callback:
                 self._callback(board, relay, old_state, new_state)
-            self._states[board][relay] = new_state
+            self._states[board][addr] = new_state
 
     def send(self, command):
         """Send data to the relay controller."""
         # FIX: If error, reconnect
+        _LOGGER.info('SENDING: %s', command)
         self._socket.send((command+'\n').encode('utf8'))
 
     def run(self):
@@ -90,12 +96,15 @@ class Pencompy(Thread):
                     data += byte.decode('utf-8')
 
     def _processReceivedData(self, data):
-        if len(data) > 0:
-            bits = int(data)
-            mask = 0x0001
-            for relay in range(RELAYS_PER_BOARD):
-                self._update_state(relay, (bits & mask) != 0)
-                mask <<= 1
+        try:
+            if len(data) > 0:
+                bits = int(data)
+                mask = 0x0001
+                for relay in range(RELAYS_PER_BOARD):
+                    self._update_state(relay, (bits & mask) != 0)
+                    mask <<= 1
+        except ValueError:
+            pass
 
     def close(self):
         """Close the connection."""
