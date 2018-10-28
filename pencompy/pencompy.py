@@ -44,7 +44,7 @@ class Pencompy(Thread):
     def _connect(self):
         # Add userID and password
         self._socket = socket.create_connection((self._host, self._port))
-        self._states = [[-1 for _ in range(RELAYS_PER_BOARD)] for _ in range(self.boards)]
+        self._states = [[None for _ in range(RELAYS_PER_BOARD)] for _ in range(self.boards)]
         self._polling_thread = Polling(self, POLLING_FREQ)
         self._polling_thread.start()
 
@@ -52,6 +52,7 @@ class Pencompy(Thread):
         """Turn a relay on/off."""
         if 0 <= board < self.boards and 0 <= addr < RELAYS_PER_BOARD:
             self.send('%s%s%d' % (BOARD_NUM(board), 'H' if state else 'L', addr+1))
+            self._update_state(board, addr, state)
         else:
             _LOGGER.error('SET Board or Addr out of range: %s, %s', board, addr)
 
@@ -61,12 +62,9 @@ class Pencompy(Thread):
             return self._states[board][addr]
         else:
             _LOGGER.error('GET Board or Addr out of range: %s, %s', board, addr)
-        return -1
+        return None 
 
-    def _update_state(self, addr, new_state):
-        if 0 <= addr < RELAYS_PER_BOARD:
-            return
-        board = self.polling_board
+    def _update_state(self, board, addr, new_state):
         old_state = self._states[board][addr]
         if old_state != new_state:
             if self._callback:
@@ -76,7 +74,6 @@ class Pencompy(Thread):
     def send(self, command):
         """Send data to the relay controller."""
         # FIX: If error, reconnect
-        _LOGGER.info('SENDING: %s', command)
         self._socket.send((command+'\n').encode('utf8'))
 
     def run(self):
@@ -101,7 +98,7 @@ class Pencompy(Thread):
                 bits = int(data)
                 mask = 0x0001
                 for relay in range(RELAYS_PER_BOARD):
-                    self._update_state(relay, (bits & mask) != 0)
+                    self._update_state(self.polling_board, relay, (bits & mask) != 0)
                     mask <<= 1
         except ValueError:
             pass
@@ -109,9 +106,6 @@ class Pencompy(Thread):
     def close(self):
         """Close the connection."""
         self._running = False
-        if self._polling_thread:
-            self._polling_thread.halt()
-            self._polling_thread = None
         if self._socket:
             time.sleep(POLLING_FREQ)
             self._socket.close()
@@ -119,21 +113,15 @@ class Pencompy(Thread):
 
 
 class Polling(Thread):
-    """Thread that asks for each board's status at a specified interval."""
+    """Thread that asks for each board's status."""
 
     def __init__(self, pencom, delay):
         super(Polling, self).__init__()
         self._pencom = pencom
         self._delay = delay
-        self._running = True
 
     def run(self):
-        while self._running:
-            for board in range(self._pencom.boards):
-                self._pencom.polling_board = board
-                self._pencom.send('%sR0' % BOARD_NUM(board))
-                time.sleep(self._delay)
-
-    def halt(self):
-        """Terminate polling thread."""
-        self._running = False
+        for board in range(self._pencom.boards):
+            self._pencom.polling_board = board
+            self._pencom.send('%sR0' % BOARD_NUM(board))
+            time.sleep(self._delay)

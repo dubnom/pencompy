@@ -82,6 +82,7 @@ class PencomRelay(SwitchDevice):
     @property
     def is_on(self):
         """Return a relay's state."""
+        _LOGGER.info('IS ON: %s, %s, %s', self._board, self._addr, self._state)
         return self._state
 
     def turn_on(self, **kwargs):
@@ -94,4 +95,5 @@ class PencomRelay(SwitchDevice):
 
     def update(self):
         """Refresh a relay's state."""
+        _LOGGER.info('UPDATE CALLED: %s, %s', self._board, self._addr)
         self._state = self._hub.get(self._board, self._addr)
