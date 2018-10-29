@@ -41,7 +41,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Setup the Pencom relay platform (pencompy)."""
-    from pencompy.pencompy import Pencompy, RELAYS_PER_BOARD
+    from pencompy.pencompy import Pencompy
 
     # Assign configuration variables.
     host = config.get(CONF_HOST)
@@ -65,8 +65,10 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     add_devices(devs, True)
     return True
 
+
 class PencomRelay(SwitchDevice):
     """Representation of a pencom relay."""
+
     def __init__(self, hub, board, addr, name):
         self._hub = hub
         self._board = board
