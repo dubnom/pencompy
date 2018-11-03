@@ -68,7 +68,7 @@ class Pencompy(Thread):
         old_state = self._states[board][addr]
         if old_state != new_state:
             if self._callback:
-                self._callback(board, relay, old_state, new_state)
+                self._callback(board, addr, old_state, new_state)
             self._states[board][addr] = new_state
 
     def send(self, command):
