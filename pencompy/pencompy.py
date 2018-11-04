@@ -28,6 +28,7 @@ class Pencompy(Thread):
     _polling_thread = None
     _socket = None
     _running = False
+    _disconnected = False
     polling_board = 0
 
     def __init__(self, host, port, boards=1, callback=None):
@@ -42,11 +43,14 @@ class Pencompy(Thread):
         self.start()
 
     def _connect(self):
-        # Add userID and password
-        self._socket = socket.create_connection((self._host, self._port))
-        self._states = [[None for _ in range(RELAYS_PER_BOARD)] for _ in range(self.boards)]
-        self._polling_thread = Polling(self, POLLING_FREQ)
-        self._polling_thread.start()
+        try:
+            self._socket = socket.create_connection((self._host, self._port))
+            self._states = [[None for _ in range(RELAYS_PER_BOARD)] for _ in range(self.boards)]
+            self._disconnected = False
+            self._polling_thread = Polling(self, POLLING_FREQ)
+            self._polling_thread.start()
+        except (BlockingIOError, ConnectionError, TimeoutError) as error:
+            _LOGGER.error("Connection: %s", error)
 
     def set(self, board, addr, state):
         """Turn a relay on/off."""
@@ -73,8 +77,12 @@ class Pencompy(Thread):
 
     def send(self, command):
         """Send data to the relay controller."""
-        # FIX: If error, reconnect
-        self._socket.send((command+'\n').encode('utf8'))
+        # FIX: If it is a state changing command, perhaps buffer it
+        # until reconnected?
+        try:
+            self._socket.send((command+'\n').encode('utf8'))
+        except ConnectionError:
+            self._disconnected = True
 
     def run(self):
         self._running = True
@@ -91,6 +99,8 @@ class Pencompy(Thread):
                     data = ''
                 else:
                     data += byte.decode('utf-8')
+            if self._disconnected:
+                self._connect()
 
     def _processReceivedData(self, data):
         try:
@@ -101,7 +111,7 @@ class Pencompy(Thread):
                     self._update_state(self.polling_board, relay, (bits & mask) != 0)
                     mask <<= 1
         except ValueError:
-            pass
+            _LOGGER.error("Received weird data: %s", data)
 
     def close(self):
         """Close the connection."""
