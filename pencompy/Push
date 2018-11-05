@@ -1,4 +1,4 @@
-cp pencom.py ~/dev/home-assistant/homeassistant/components/switch
+cp -r ha/ ~/dev/home-assistant/homeassistant/components
 cd ..
 pip uninstall pencompy
 python3 setup.py sdist bdist_wheel
