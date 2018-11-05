@@ -97,3 +97,10 @@ class PencomRelay(SwitchDevice):
     def update(self):
         """Refresh a relay's state."""
         self._state = self._hub.get(self._board, self._addr)
+
+    @property
+    def device_state_attributes(self):
+        """Return supported attributes."""
+        return {"Board": self._board,
+                "Addr": self._addr}
+
