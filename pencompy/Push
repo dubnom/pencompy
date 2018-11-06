@@ -1,7 +1,2 @@
 target=~/dev/home-assistant/homeassistant/components
 cp ha/switch/pencom.py $target/switch
-cd ..
-python3 setup.py sdist bdist_wheel
-twine upload dist/*
-pip install --upgrade pencompy
-cd pencompy
