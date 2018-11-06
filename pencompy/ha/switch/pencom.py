@@ -1,7 +1,7 @@
-"""
-Pencom implements the "Switch" interface to control one or more banks of relays
-over an Ethernet connection.  The relays are connected through RS232 to an
-RS232 to Ethernet convertor (NPort).
+"""Pencom relay control.
+
+For more details about this component, please refer to the documentation at
+http://home-assistant.io/components/pencom
 """
 import logging
 
@@ -13,7 +13,7 @@ from homeassistant.const import CONF_HOST, CONF_PORT, CONF_NAME
 import homeassistant.helpers.config_validation as cv
 
 # Home Assistant depends on 3rd party packages for API specific code.
-REQUIREMENTS = ['pencompy==0.0.1']
+REQUIREMENTS = ['pencompy==0.0.2']
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
 
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
-    """Setup the Pencom relay platform (pencompy)."""
+    """Pencom relay platform (pencompy)."""
     from pencompy.pencompy import Pencompy
 
     # Assign configuration variables.
@@ -70,6 +70,7 @@ class PencomRelay(SwitchDevice):
     """Representation of a pencom relay."""
 
     def __init__(self, hub, board, addr, name):
+        """Create a relay."""
         self._hub = hub
         self._board = board
         self._addr = addr
@@ -103,4 +104,3 @@ class PencomRelay(SwitchDevice):
         """Return supported attributes."""
         return {"Board": self._board,
                 "Addr": self._addr}
-

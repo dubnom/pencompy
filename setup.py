@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="pencompy",
-    version="0.0.1",
+    version="0.0.2",
     author="Michael Dubno",
     author_email="michael@dubno.com",
     description="Pencom relay controller over Ethernet",

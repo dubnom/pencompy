@@ -28,7 +28,6 @@ class Pencompy(Thread):
     _polling_thread = None
     _socket = None
     _running = False
-    _disconnected = False
     polling_board = 0
 
     def __init__(self, host, port, boards=1, callback=None):
@@ -40,15 +39,16 @@ class Pencompy(Thread):
         self.boards = boards
 
         self._connect()
+        if self._socket == None:
+            raise ConnectionError("Couldn't connect to '%s:%d'" % (host, port))
+        self._polling_thread = Polling(self, POLLING_FREQ)
+        self._polling_thread.start()
         self.start()
 
     def _connect(self):
+        self._states = [[None for _ in range(RELAYS_PER_BOARD)] for _ in range(self.boards)]
         try:
             self._socket = socket.create_connection((self._host, self._port))
-            self._states = [[None for _ in range(RELAYS_PER_BOARD)] for _ in range(self.boards)]
-            self._disconnected = False
-            self._polling_thread = Polling(self, POLLING_FREQ)
-            self._polling_thread.start()
         except (BlockingIOError, ConnectionError, TimeoutError) as error:
             _LOGGER.error("Connection: %s", error)
 
@@ -77,30 +77,32 @@ class Pencompy(Thread):
 
     def send(self, command):
         """Send data to the relay controller."""
-        # FIX: If it is a state changing command, perhaps buffer it
-        # until reconnected?
         try:
             self._socket.send((command+'\n').encode('utf8'))
-        except ConnectionError:
-            self._disconnected = True
+            return True
+        except (ConnectionError, AttributeError):
+            self._socket = None
+            return False
 
     def run(self):
         self._running = True
         data = ''
         while self._running:
-            try:
-                readable, _, _ = select.select([self._socket], [], [], POLLING_FREQ)
-            except socket.error as err:
-                raise
-            if len(readable) != 0:
-                byte = self._socket.recv(1)
-                if byte == b'\r':
-                    self._processReceivedData(data.strip())
-                    data = ''
-                else:
-                    data += byte.decode('utf-8')
-            if self._disconnected:
+            if self._socket == None:
+                time.sleep(POLLING_FREQ)
                 self._connect()
+            else:
+                try:
+                    readable, _, _ = select.select([self._socket], [], [], POLLING_FREQ)
+                    if len(readable) != 0:
+                        byte = self._socket.recv(1)
+                        if byte == b'\r':
+                            self._processReceivedData(data.strip())
+                            data = ''
+                        else:
+                            data += byte.decode('utf-8')
+                except (ConnectionError, AttributeError):
+                    self._socket = None
 
     def _processReceivedData(self, data):
         try:
