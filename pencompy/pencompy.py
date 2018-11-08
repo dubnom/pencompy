@@ -56,7 +56,6 @@ class Pencompy(Thread):
         """Turn a relay on/off."""
         if 0 <= board < self.boards and 0 <= addr < RELAYS_PER_BOARD:
             self.send('%s%s%d' % (BOARD_NUM(board), 'H' if state else 'L', addr+1))
-            self._update_state(board, addr, state)
         else:
             _LOGGER.error('SET Board or Addr out of range: %s, %s', board, addr)
 
@@ -78,7 +77,7 @@ class Pencompy(Thread):
     def send(self, command):
         """Send data to the relay controller."""
         try:
-            self._socket.send((command+'\n').encode('utf8'))
+            self._socket.send((command+'\r').encode('utf8'))
             return True
         except (ConnectionError, AttributeError):
             self._socket = None
