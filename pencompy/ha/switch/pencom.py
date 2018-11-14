@@ -13,7 +13,7 @@ from homeassistant.const import CONF_HOST, CONF_PORT, CONF_NAME
 import homeassistant.helpers.config_validation as cv
 
 # Home Assistant depends on 3rd party packages for API specific code.
-REQUIREMENTS = ['pencompy==0.0.2']
+REQUIREMENTS = ['pencompy==0.0.3']
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -98,9 +98,3 @@ class PencomRelay(SwitchDevice):
     def update(self):
         """Refresh a relay's state."""
         self._state = self._hub.get(self._board, self._addr)
-
-    @property
-    def device_state_attributes(self):
-        """Return supported attributes."""
-        return {"Board": self._board,
-                "Addr": self._addr}
