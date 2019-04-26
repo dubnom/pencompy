@@ -117,6 +117,9 @@ class Pencompy(Thread):
     def close(self):
         """Close the connection."""
         self._running = False
+        if self._polling_thread:
+            self._polling_thread.close()
+            self._polling_thread = None
         if self._socket:
             time.sleep(POLLING_FREQ)
             self._socket.close()
@@ -130,9 +133,18 @@ class Polling(Thread):
         super(Polling, self).__init__()
         self._pencom = pencom
         self._delay = delay
+        self._running = False
 
     def run(self):
-        for board in range(self._pencom.boards):
-            self._pencom.polling_board = board
-            self._pencom.send('%sR0' % BOARD_NUM(board))
-            time.sleep(self._delay)
+        self._running = True
+        while self._running:
+            for board in range(self._pencom.boards):
+                self._pencom.polling_board = board
+                self._pencom.send('%sR0' % BOARD_NUM(board))
+                if not self._running:
+                    break
+                time.sleep(self._delay)
+
+    def close(self):
+        self._running = False
+        time.sleep(self._delay)
